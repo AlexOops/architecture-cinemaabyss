@@ -1,0 +1,63 @@
+@startuml CinemaAbyss_Containers
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title CinemaAbyss — To-Be — C4 Containers
+
+' ===== Personas =====
+Person(user, "Пользователь", "Смотрит контент, ставит оценки, ведёт избранное, оформляет подписку.")
+
+' ===== External systems =====
+System_Ext(payment, "Платёжная система", "Эквайринг/платежи")
+System_Ext(reco, "Внешняя рекомендательная система", "Подборки/рекомендации")
+System_Ext(partners, "Онлайн-кинотеатры/источники", "Партнёрские каталоги и ссылки/плейлисты")
+System_Ext(s3, "S3/Object Storage", "Постеры, обложки, статика, возможно трейлеры")
+
+' ===== Entry point =====
+Container(gateway, "API Gateway / BFF", "Nginx/Envoy/Go", "Единая точка входа. Маршрутизация, auth, rate-limit, агрегация ответов под разные клиенты (mobile/web/tv).")
+
+' ===== Core services =====
+Container(authSvc, "Auth Service", "Go", "Аутентификация, сессии/токены, базовый профиль пользователя.")
+Container(subSvc, "Subscription Service", "Go", "Подписки, тарифы, доступ к контенту.")
+Container(paySvc, "Payment Service", "Go", "Платежи, вебхуки, статусы транзакций.")
+Container(moviesSvc, "Movies/Metadata Service", "Go", "Метаданные фильмов: жанры, актёры, оценки, карточки.")
+Container(userLibSvc, "User Library Service", "Go", "Избранное, списки, история просмотров (минимальный MVP).")
+Container(streamAggSvc, "Streaming Aggregator Service", "Go", "Получение ссылок/плейлистов у партнёров, нормализация, доступность контента.")
+Container(eventsSvc, "Events Service", "Go", "Публикация событий домена (просмотр/оценка/платёж). Продюсер/консьюмер Kafka.")
+
+' ===== Data stores (разделяем по доменам) =====
+ContainerDb(authDb, "Auth DB", "PostgreSQL", "Пользователи/учётные записи")
+ContainerDb(subDb, "Subscription DB", "PostgreSQL", "Подписки/тарифы")
+ContainerDb(payDb, "Payment DB", "PostgreSQL", "Платежи/статусы")
+ContainerDb(moviesDb, "Movies DB", "PostgreSQL", "Метаданные")
+ContainerDb(userLibDb, "User Library DB", "PostgreSQL", "Избранное/история")
+
+' ===== Messaging =====
+ContainerQueue(kafka, "Kafka", "Kafka", "Событийная шина для слабосвязанного взаимодействия сервисов.")
+
+' ===== Relations =====
+Rel(user, gateway, "Использует (Web/Mobile/TV)", "HTTPS")
+
+Rel(gateway, authSvc, "Логин/профиль", "HTTPS/REST")
+Rel(gateway, moviesSvc, "Карточки/поиск/метаданные", "HTTPS/REST")
+Rel(gateway, userLibSvc, "Избранное/история", "HTTPS/REST")
+Rel(gateway, subSvc, "Подписки/права доступа", "HTTPS/REST")
+Rel(gateway, streamAggSvc, "Доступность/ссылки партнёров", "HTTPS/REST")
+Rel(gateway, paySvc, "Оплата/статусы", "HTTPS/REST")
+Rel(gateway, reco, "Запрос рекомендаций", "HTTPS")
+
+Rel(paySvc, payment, "Проводит платежи", "HTTPS")
+Rel(paySvc, kafka, "PaymentSucceeded/Failed", "Kafka")
+Rel(subSvc, kafka, "Подписки/изменения тарифа", "Kafka")
+Rel(userLibSvc, kafka, "Watch/Like/Favorite events", "Kafka")
+Rel(eventsSvc, kafka, "Produce/Consume доменные события", "Kafka")
+
+Rel(streamAggSvc, partners, "Каталоги/линки/плейлисты", "HTTPS")
+Rel(moviesSvc, s3, "Постеры/обложки", "HTTPS")
+
+Rel(authSvc, authDb, "R/W", "SQL")
+Rel(subSvc, subDb, "R/W", "SQL")
+Rel(paySvc, payDb, "R/W", "SQL")
+Rel(moviesSvc, moviesDb, "R/W", "SQL")
+Rel(userLibSvc, userLibDb, "R/W", "SQL")
+
+@enduml

@@ -15,7 +15,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -91,11 +91,14 @@ services:
     depends_on:
       - postgres
       - kafka
-    ports:
-      - "8082:8082"
     environment:
       PORT: 8082
       KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC_MOVIE: movie-events
+      KAFKA_TOPIC_USER: user-events
+      KAFKA_TOPIC_PAYMENT: payment-events
+    ports:
+      - "8082:8082"
     networks:
       - cinemaabyss-network
 
