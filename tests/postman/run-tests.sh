@@ -115,9 +115,21 @@ if [ "$USE_DOCKER" = true ]; then
   docker build -t cinemaabyss-api-tests .
   
   # Run the tests in Docker
-  docker run --network=cinemaabyss-network \
-    -v "$(pwd)/reports:/app/reports" \
-    cinemaabyss-api-tests $CMD_ARGS
+  # Try to detect docker-compose network name (CI-safe)
+  NETWORK_NAME="$(docker network ls --format '{{.Name}}' | grep -E 'cinemaabyss(_default)?$|architecture-cinemaabyss(_default)?$|_default$' | head -n 1)"
+
+  echo "Detected Docker network: ${NETWORK_NAME:-<none>}"
+
+  if [ -n "$NETWORK_NAME" ]; then
+    docker run --network="$NETWORK_NAME" \
+      -v "$(pwd)/reports:/app/reports" \
+      cinemaabyss-api-tests $CMD_ARGS
+  else
+    # Fallback: run without explicit network (won't fail due to missing network)
+    docker run \
+      -v "$(pwd)/reports:/app/reports" \
+      cinemaabyss-api-tests $CMD_ARGS
+  fi
 else
   echo "Running tests locally..."
   
