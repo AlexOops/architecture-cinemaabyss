@@ -144,5 +144,5 @@ volumes:
 
 networks:
   cinemaabyss-network:
+    external: true
     name: cinemaabyss-network
-    driver: bridge
