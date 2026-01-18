@@ -6,52 +6,28 @@ on:
   pull_request:
     branches: [ main, master ]
   workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to run tests against'
-        required: true
-        default: 'docker'
-        type: choice
-        options:
-          - local
-          - docker
-      test_folder:
-        description: 'Test folder to run (leave empty for all)'
-        required: false
-        type: string
 
 jobs:
   api-tests:
-    name: Run API Tests
     runs-on: ubuntu-latest
 
     env:
-      COMPOSE_PROJECT_NAME: cinemaabyss
-      COMPOSE_NETWORK: cinemaabyss_default
+      COMPOSE_NETWORK: cinemaabyss-network
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Docker Compose
+      - name: Docker Compose version
         run: docker compose --version
 
       - name: Start services with Docker Compose
         run: |
-          docker compose up -d
+          docker compose up -d --build
           echo "Waiting for services to be ready..."
           sleep 120
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: tests/postman/package-lock.json
-
-      - name: Install Newman and dependencies
-        working-directory: tests/postman
-        run: npm install
+          docker compose ps
+          docker network ls | grep "${{ env.COMPOSE_NETWORK }}" || true
 
       - name: Build API tests image
         working-directory: tests/postman
@@ -62,9 +38,9 @@ jobs:
         run: |
           mkdir -p reports
           docker run --rm \
-            --network=${{ env.COMPOSE_NETWORK }} \
+            --network="${{ env.COMPOSE_NETWORK }}" \
             -v "$(pwd)/reports:/app/reports" \
-            cinemaabyss-api-tests
+            cinemaabyss-api-tests -d -e docker
 
       - name: Stop services
         if: always()

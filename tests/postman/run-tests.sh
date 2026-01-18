@@ -135,7 +135,7 @@ if [ "$USE_DOCKER" = true ]; then
   # Run the tests container inside the same network
   docker run --network="$NETWORK_NAME" \
     -v "$(pwd)/reports:/app/reports" \
-    cinemaabyss-api-tests "${CMD_ARGS[@]}"
+    cinemaabyss-api-tests "$CMD_ARGS"
 
 else
   echo "Running tests locally..."
