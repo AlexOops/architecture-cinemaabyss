@@ -38,6 +38,8 @@
 
 # Задание 3. Реализация CI/CD и настройка Proxy в Kubernetes
 
+![img.png](img.png)
+
 ## Часть 1. CI/CD
 
 Доработан workflow `.github/workflows/docker-build-push.yml`:
