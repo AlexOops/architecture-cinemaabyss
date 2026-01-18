@@ -9,6 +9,7 @@ on:
 
 jobs:
   api-tests:
+    name: Run API Tests
     runs-on: ubuntu-latest
 
     env:
@@ -20,6 +21,11 @@ jobs:
 
       - name: Docker Compose version
         run: docker compose --version
+
+      - name: Ensure network exists
+        run: |
+          docker network inspect "${{ env.COMPOSE_NETWORK }}" >/dev/null 2>&1 || \
+          docker network create "${{ env.COMPOSE_NETWORK }}"
 
       - name: Start services with Docker Compose
         run: |
@@ -36,6 +42,7 @@ jobs:
       - name: Run API tests
         working-directory: tests/postman
         run: |
+          set -e
           mkdir -p reports
           docker run --rm \
             --network="${{ env.COMPOSE_NETWORK }}" \
