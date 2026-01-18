@@ -23,11 +23,29 @@ jobs:
 
       - name: Start services with Docker Compose
         run: |
+          set -e
           docker compose up -d --build
-          echo "Waiting for services to be ready..."
-          sleep 120
           docker compose ps
           docker network ls | grep "${{ env.COMPOSE_NETWORK }}" || true
+
+      - name: Wait for services (HTTP)
+        run: |
+          set -e
+          for i in $(seq 1 120); do
+            if curl -fsS http://localhost:8080/health >/dev/null 2>&1 && \
+               curl -fsS http://localhost:8081/api/movies/health >/dev/null 2>&1 && \
+               curl -fsS http://localhost:8082/api/events/health >/dev/null 2>&1 && \
+               curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
+              echo "All services are up"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Services not ready"
+          docker compose ps
+          docker compose logs --no-color --tail=200 monolith movies-service events-service proxy-service
+          exit 1
 
       - name: Build API tests image
         working-directory: tests/postman
@@ -41,7 +59,7 @@ jobs:
           docker run --rm \
             --network="${{ env.COMPOSE_NETWORK }}" \
             -v "$(pwd)/reports:/app/reports" \
-            cinemaabyss-api-tests -d -e docker
+            cinemaabyss-api-tests -e docker
 
       - name: Stop services
         if: always()

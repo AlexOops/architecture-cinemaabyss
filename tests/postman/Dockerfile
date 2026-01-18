@@ -2,17 +2,12 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# Copy package.json and package-lock.json
 COPY package*.json ./
 
-# Install dependencies
-RUN npm install
+# Prefer deterministic installs in CI if package-lock.json is present
+RUN if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-# Copy test files
 COPY . .
 
-# Set default command to run tests
 ENTRYPOINT ["node", "run-tests.js"]
-
-# Default arguments - can be overridden at runtime
 CMD ["--environment", "docker"]

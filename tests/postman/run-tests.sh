@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-# Script to run Postman tests using Newman
-
 function show_usage {
   echo "Usage: $0 [options]"
   echo ""
@@ -18,7 +16,7 @@ function show_usage {
 
 ENVIRONMENT="local"
 FOLDER=""
-REPORTERS="cli,htmlextra,junit"
+REPORTERS="cli,htmlextra,junitfull"
 BAIL=false
 TIMEOUT=10000
 USE_DOCKER=false
@@ -39,28 +37,15 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-if [ "$USE_DOCKER" = false ]; then
-  command -v node >/dev/null 2>&1 || { echo "Error: Node.js is not installed."; exit 1; }
-  command -v npm  >/dev/null 2>&1 || { echo "Error: npm is not installed."; exit 1; }
-fi
-
-# Build args as array (IMPORTANT)
-CMD_ARGS=(--environment "$ENVIRONMENT")
+# Build args as array
+CMD_ARGS=(--environment "$ENVIRONMENT" --reporters "$REPORTERS" --timeout "$TIMEOUT")
 
 if [ -n "$FOLDER" ]; then
   CMD_ARGS+=(--folder "$FOLDER")
 fi
 
-if [ -n "$REPORTERS" ]; then
-  CMD_ARGS+=(--reporters "$REPORTERS")
-fi
-
 if [ "$BAIL" = true ]; then
   CMD_ARGS+=(--bail)
-fi
-
-if [ -n "$TIMEOUT" ]; then
-  CMD_ARGS+=(--timeout "$TIMEOUT")
 fi
 
 mkdir -p reports
@@ -70,9 +55,7 @@ if [ "$USE_DOCKER" = true ]; then
 
   docker build -t cinemaabyss-api-tests .
 
-  # fixed network name (matches docker-compose.yml: networks.cinemaabyss-network.name)
   NETWORK_NAME="${COMPOSE_NETWORK:-cinemaabyss-network}"
-
   echo "Using Docker network: $NETWORK_NAME"
 
   docker run --rm \
@@ -82,6 +65,9 @@ if [ "$USE_DOCKER" = true ]; then
 
 else
   echo "Running tests locally..."
+
+  command -v node >/dev/null 2>&1 || { echo "Error: Node.js is not installed."; exit 1; }
+  command -v npm  >/dev/null 2>&1 || { echo "Error: npm is not installed."; exit 1; }
 
   if [ ! -d "node_modules" ]; then
     npm install
