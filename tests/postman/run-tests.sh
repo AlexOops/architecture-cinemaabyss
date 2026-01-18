@@ -114,22 +114,29 @@ if [ "$USE_DOCKER" = true ]; then
   # Build the Docker image
   docker build -t cinemaabyss-api-tests .
   
-  # Run the tests in Docker
-  # Try to detect docker-compose network name (CI-safe)
-  NETWORK_NAME="$(docker network ls --format '{{.Name}}' | grep -E 'cinemaabyss(_default)?$|architecture-cinemaabyss(_default)?$|_default$' | head -n 1)"
-
-  echo "Detected Docker network: ${NETWORK_NAME:-<none>}"
-
-  if [ -n "$NETWORK_NAME" ]; then
-    docker run --network="$NETWORK_NAME" \
-      -v "$(pwd)/reports:/app/reports" \
-      cinemaabyss-api-tests $CMD_ARGS
-  else
-    # Fallback: run without explicit network (won't fail due to missing network)
-    docker run \
-      -v "$(pwd)/reports:/app/reports" \
-      cinemaabyss-api-tests $CMD_ARGS
+  # Detect docker-compose network name from running compose containers
+  COMPOSE_CONTAINER_ID="$(docker compose ps -q | head -n 1 || true)"
+  if [[ -z "$COMPOSE_CONTAINER_ID" ]]; then
+    echo "❌ No running docker-compose containers found. Did you run 'docker compose up -d'?"
+    exit 1
   fi
+
+  NETWORK_NAME="$(docker inspect "$COMPOSE_CONTAINER_ID" \
+    --format '{{range $k, $v := .NetworkSettings.Networks}}{{println $k}}{{end}}' \
+    | head -n 1)"
+
+  if [[ -z "$NETWORK_NAME" ]]; then
+    echo "❌ Failed to detect docker network from container: $COMPOSE_CONTAINER_ID"
+    exit 1
+  fi
+
+  echo "Detected Docker network: $NETWORK_NAME"
+
+  # Run the tests container inside the same network
+  docker run --network="$NETWORK_NAME" \
+    -v "$(pwd)/reports:/app/reports" \
+    cinemaabyss-api-tests "${CMD_ARGS[@]}"
+
 else
   echo "Running tests locally..."
   
