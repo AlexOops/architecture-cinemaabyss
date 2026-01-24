@@ -6,9 +6,10 @@ on:
     branches: [ main ]
     paths:
       - 'src/**'
+      - 'tests/**'
       - '.github/workflows/docker-build-push.yml'
   release:
-    types: [ published ]
+    types: [published]
 
 env:
   REGISTRY: ghcr.io
@@ -18,7 +19,57 @@ env:
   PROXY_SERVICE_IMAGE_NAME: ${{ github.repository }}/proxy-service
 
 jobs:
+  api-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Start services with Docker Compose
+        run: |
+          docker compose up -d --build
+          docker compose ps
+          sleep 60
+
+      - name: Build API tests image
+        working-directory: tests/postman
+        run: docker build -t cinemaabyss-api-tests .
+
+      - name: Detect docker-compose network name
+        id: net
+        shell: bash
+        run: |
+          set -e
+          COMPOSE_CONTAINER_ID="$(docker compose ps -q | head -n 1 || true)"
+          if [[ -z "$COMPOSE_CONTAINER_ID" ]]; then
+            echo "No running docker-compose containers found."
+            exit 1
+          fi
+          NETWORK_NAME="$(docker inspect "$COMPOSE_CONTAINER_ID" \
+            --format '{{range $k, $v := .NetworkSettings.Networks}}{{println $k}}{{end}}' \
+            | head -n 1)"
+          if [[ -z "$NETWORK_NAME" ]]; then
+            echo "Failed to detect docker network from container: $COMPOSE_CONTAINER_ID"
+            exit 1
+          fi
+          echo "network=$NETWORK_NAME" >> $GITHUB_OUTPUT
+          echo "Detected Docker network: $NETWORK_NAME"
+
+      - name: Run API tests (docker env)
+        working-directory: tests/postman
+        shell: bash
+        run: |
+          mkdir -p reports
+          docker run --rm --network="${{ steps.net.outputs.network }}" \
+            -v "$(pwd)/reports:/app/reports" \
+            cinemaabyss-api-tests --environment docker
+
+      - name: Stop services
+        if: always()
+        run: docker compose down -v
+
   build-and-push:
+    needs: api-tests
     runs-on: ubuntu-latest
     permissions:
       contents: read
