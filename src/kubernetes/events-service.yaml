@@ -19,7 +19,7 @@ spec:
         - name: dockerconfigjson
       containers:
         - name: events-service
-          image: ghcr.io/alexoops/architecture-cinemaabyss/proxy-service:latest
+          image: ghcr.io/alexoops/architecture-cinemaabyss/events-service:latest
           imagePullPolicy: Always
           ports:
             - containerPort: 8082

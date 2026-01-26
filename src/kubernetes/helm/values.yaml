@@ -5,7 +5,7 @@ global:
 
 # Image pull secrets
 imagePullSecrets:
-  dockerconfigjson: QWxleE9vcHM6Z2l0aHViX3BhdF8xMUFSNUI0WEEwNEVDR3hmdmRSek9iX0FTTDVTa3FZQWlzNXNVZzB1TDZNUUVVb3AzenJCUlBDakJsQ2xhTk5BZkdEMk5GUFVVRllNTnBnNDhw
+  dockerconfigjson: eyJhdXRocyI6eyJnaGNyLmlvIjp7InVzZXJuYW1lIjoiQWxleE9vcHMiLCJwYXNzd29yZCI6ImdpdGh1Yl9wYXRfMTFBUjVCNFhBMEpVMndtb3NBMnBXel9rVlhBMThBSEpuc0JqdEZTbnhITjVGdG1ZUVd1U21YR2NPRHdTeUFKV2Q0TjZJMk5aWVYxUXE3UmRoTSIsImVtYWlsIjoiODc2ODkwNTIxM0BtYWlsLnJ1IiwiYXV0aCI6IlFXeGxlRTl2Y0hNNloybDBhSFZpWDNCaGRGOHhNVUZTTlVJMFdFRXdTbFV5ZDIxdmMwRXljRmQ2WDJ0V1dFRXhPRUZJU201elFtcDBSbE51ZUVoT05VWjBiVmxSVjNWVGJWaEhZMDlFZDFONVFVcFhaRFJPTmtreVRscFpWakZSY1RkU1pHaE4ifX19
 # Database configuration
 database:
   host: postgres
@@ -119,14 +119,14 @@ kafka:
   replicas: 1
   resources:
     limits:
-      cpu: 1000m
-      memory: 1Gi
+      cpu: 500m
+      memory: 768Mi
     requests:
       cpu: 200m
       memory: 512Mi
   persistence:
-    enabled: true
-    size: 5Gi
+    enabled: false
+    size: 2Gi
     accessMode: ReadWriteOnce
   topics:
     - name: movie-events
@@ -149,13 +149,13 @@ zookeeper:
   replicas: 1
   resources:
     limits:
-      cpu: 500m
-      memory: 512Mi
-    requests:
-      cpu: 100m
+      cpu: 200m
       memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
   persistence:
-    enabled: true
+    enabled: false
     size: 1Gi
     accessMode: ReadWriteOnce
 
