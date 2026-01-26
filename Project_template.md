@@ -126,6 +126,14 @@ __________
 
 Реализовал Helm-чарты для сервисов proxy и events.
 
+![img_11.png](img_11.png)
+
+![img_12.png](img_12.png)
+
+![img_13.png](img_13.png)
+
+![img_14.png](img_14.png)
+
 В `values.yaml`:
 - заменены образы на собственные из GHCR
 - настроен imagePullSecret для доступа к приватным образам
