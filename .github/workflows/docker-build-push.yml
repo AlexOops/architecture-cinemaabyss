@@ -2,12 +2,13 @@ name: Docker Build and Push
 
 on:
   workflow_dispatch:
+
   push:
-    branches: [ main ]
-    paths:
-      - 'src/**'
-      - 'tests/**'
-      - '.github/workflows/docker-build-push.yml'
+    branches: ["**"]
+
+  pull_request:
+    branches: ["**"]
+
   release:
     types: [published]
 
@@ -70,6 +71,7 @@ jobs:
 
   build-and-push:
     needs: api-tests
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.event_name == 'release')
     runs-on: ubuntu-latest
     permissions:
       contents: read

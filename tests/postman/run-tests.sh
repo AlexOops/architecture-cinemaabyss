@@ -51,11 +51,29 @@ fi
 mkdir -p reports
 
 if [ "$USE_DOCKER" = true ]; then
-  echo "Running tests in Docker container..."
+ echo "Running tests in Docker container..."
 
   docker build -t cinemaabyss-api-tests .
 
-  NETWORK_NAME="${COMPOSE_NETWORK:-cinemaabyss-network}"
+  if [ -n "$COMPOSE_NETWORK" ]; then
+    NETWORK_NAME="$COMPOSE_NETWORK"
+  else
+    COMPOSE_CONTAINER_ID="$(docker compose ps -q | head -n 1 || true)"
+    if [[ -z "$COMPOSE_CONTAINER_ID" ]]; then
+      echo "No running docker-compose containers found. Start docker compose first."
+      exit 1
+    fi
+
+    NETWORK_NAME="$(docker inspect "$COMPOSE_CONTAINER_ID" \
+      --format '{{range $k, $v := .NetworkSettings.Networks}}{{println $k}}{{end}}' \
+      | head -n 1)"
+
+    if [[ -z "$NETWORK_NAME" ]]; then
+      echo "Failed to detect docker network from container: $COMPOSE_CONTAINER_ID"
+      exit 1
+    fi
+  fi
+
   echo "Using Docker network: $NETWORK_NAME"
 
   docker run --rm \
