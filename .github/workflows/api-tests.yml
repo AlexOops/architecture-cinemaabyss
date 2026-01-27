@@ -21,19 +21,40 @@ jobs:
           docker compose up -d --build zookeeper kafka
           docker compose ps
 
-      - name: Wait for Kafka
+      - name: Wait for Kafka (logs)
         shell: bash
         run: |
           set -e
-          for i in $(seq 1 120); do
-            if docker compose exec -T kafka bash -lc 'kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1'; then
-              echo "Kafka is ready"
+          for i in $(seq 1 180); do
+            if docker compose logs --no-color kafka | grep -q "KafkaServer id=.*started"; then
+              echo "KafkaServer started"
+              break
+            fi
+            sleep 2
+          done
+          
+          if ! docker compose logs --no-color kafka | grep -q "KafkaServer id=.*started"; then
+            echo "Kafka not ready (KafkaServer did not start)"
+            docker compose logs --no-color --tail=200 zookeeper kafka
+            exit 1
+          fi
+
+      - name: Wait for Kafka topics
+        shell: bash
+        run: |
+          set -e
+          for i in $(seq 1 180); do
+            if docker compose logs --no-color kafka | grep -q "Created topic movie-events" && \
+               docker compose logs --no-color kafka | grep -q "Created topic user-events" && \
+               docker compose logs --no-color kafka | grep -q "Created topic payment-events"; then
+              echo "Kafka topics created"
               exit 0
             fi
             sleep 2
           done
-          echo "Kafka not ready"
-          docker compose logs --no-color --tail=200 zookeeper kafka
+      
+          echo "Kafka topics not created"
+          docker compose logs --no-color --tail=200 kafka
           exit 1
 
       - name: Start rest services
