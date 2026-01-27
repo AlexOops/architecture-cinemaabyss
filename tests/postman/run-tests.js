@@ -27,7 +27,7 @@ const argv = yargs(hideBin(process.argv))
     alias: 'r',
     description: 'Reporters to use (comma-separated)',
     type: 'string',
-    default: 'cli,htmlextra,junit'
+    default: 'cli,htmlextra,junitfull'
   })
   .option('bail', {
     alias: 'b',
@@ -86,7 +86,7 @@ const newmanOptions = {
       titleSize: 1,
       omitHeaders: false
     },
-    junit: {
+    junitfull: {
       export: path.join(reportsDir, `junit-report-${argv.environment}-${new Date().toISOString().replace(/:/g, '-')}.xml`)
     }
   },

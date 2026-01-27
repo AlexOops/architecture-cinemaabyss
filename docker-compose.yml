@@ -15,7 +15,7 @@ services:
       - postgres-data:/var/lib/postgresql/data
       - ./src/database/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -57,12 +57,14 @@ services:
       dockerfile: Dockerfile
     container_name: cinemaabyss-monolith
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8080:8080"
     environment:
       PORT: 8080
       DB_CONNECTION_STRING: postgres://postgres:postgres_password@postgres:5432/cinemaabyss?sslmode=disable
+    restart: always
     networks:
       - cinemaabyss-network
 
@@ -73,12 +75,14 @@ services:
       dockerfile: Dockerfile
     container_name: cinemaabyss-movies-service
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     ports:
       - "8081:8081"
     environment:
       PORT: 8081
       DB_CONNECTION_STRING: postgres://postgres:postgres_password@postgres:5432/cinemaabyss?sslmode=disable
+    restart: always
     networks:
       - cinemaabyss-network
 
@@ -89,13 +93,18 @@ services:
       dockerfile: Dockerfile
     container_name: cinemaabyss-events-service
     depends_on:
-      - postgres
-      - kafka
-    ports:
-      - "8082:8082"
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     environment:
       PORT: 8082
       KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC_MOVIE: movie-events
+      KAFKA_TOPIC_USER: user-events
+      KAFKA_TOPIC_PAYMENT: payment-events
+    ports:
+      - "8082:8082"
     networks:
       - cinemaabyss-network
 

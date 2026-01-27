@@ -2,70 +2,123 @@ name: API Tests
 
 on:
   push:
-    branches: [ main, master ]
+    branches: ["**"]
   pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: 'Environment to run tests against'
-        required: true
-        default: 'docker'
-        type: choice
-        options:
-          - local
-          - docker
-      test_folder:
-        description: 'Test folder to run (leave empty for all)'
-        required: false
-        type: string
+    branches: ["**"]
 
 jobs:
   api-tests:
-    name: Run API Tests
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Docker Compose
+      - name: Start Kafka first
+        shell: bash
         run: |
-          docker compose --version
-      
-      - name: Start services with Docker Compose
+          set -e
+          docker compose up -d --build zookeeper kafka
+          docker compose ps
+
+      - name: Wait for Kafka (logs)
+        shell: bash
         run: |
-          docker compose up -d
-          # Wait for services to be ready
-          echo "Waiting for services to be ready..."
-          sleep 120
+          set -e
+          for i in $(seq 1 180); do
+            if docker compose logs --no-color kafka | grep -q "KafkaServer id=.*started"; then
+              echo "KafkaServer started"
+              break
+            fi
+            sleep 2
+          done
+          
+          if ! docker compose logs --no-color kafka | grep -q "KafkaServer id=.*started"; then
+            echo "Kafka not ready (KafkaServer did not start)"
+            docker compose logs --no-color --tail=200 zookeeper kafka
+            exit 1
+          fi
+
+      - name: Wait for Kafka topics
+        shell: bash
+        run: |
+          set -e
+          for i in $(seq 1 180); do
+            if docker compose logs --no-color kafka | grep -q "Created topic movie-events" && \
+               docker compose logs --no-color kafka | grep -q "Created topic user-events" && \
+               docker compose logs --no-color kafka | grep -q "Created topic payment-events"; then
+              echo "Kafka topics created"
+              exit 0
+            fi
+            sleep 2
+          done
       
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-          cache: 'npm'
-          cache-dependency-path: tests/postman/package-lock.json
-      
-      - name: Install Newman and dependencies
+          echo "Kafka topics not created"
+          docker compose logs --no-color --tail=200 kafka
+          exit 1
+
+      - name: Start rest services
+        shell: bash
+        run: |
+          set -e
+          docker compose up -d --build
+          docker compose ps
+
+      - name: Wait for services (HTTP)
+        shell: bash
+        run: |
+          set -e
+          for i in $(seq 1 180); do
+            if curl -fsS http://localhost:8080/health >/dev/null 2>&1 && \
+               curl -fsS http://localhost:8081/api/movies/health >/dev/null 2>&1 && \
+               curl -fsS http://localhost:8082/api/events/health >/dev/null 2>&1 && \
+               curl -fsS http://localhost:8000/health >/dev/null 2>&1; then
+              echo "All services are up"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Services not ready"
+          docker compose ps
+          docker compose logs --no-color --tail=200 monolith movies-service events-service proxy-service
+          exit 1
+
+      - name: Detect docker-compose network name
+        id: net
+        shell: bash
+        run: |
+          set -e
+          COMPOSE_CONTAINER_ID="$(docker compose ps -q | head -n 1 || true)"
+          if [[ -z "$COMPOSE_CONTAINER_ID" ]]; then
+            echo "No running docker-compose containers found."
+            exit 1
+          fi
+          NETWORK_NAME="$(docker inspect "$COMPOSE_CONTAINER_ID" \
+            --format '{{range $k, $v := .NetworkSettings.Networks}}{{println $k}}{{end}}' \
+            | head -n 1)"
+          if [[ -z "$NETWORK_NAME" ]]; then
+            echo "Failed to detect docker network from container: $COMPOSE_CONTAINER_ID"
+            exit 1
+          fi
+          echo "network=$NETWORK_NAME" >> $GITHUB_OUTPUT
+          echo "Detected Docker network: $NETWORK_NAME"
+
+      - name: Build API tests image
         working-directory: tests/postman
-        run: npm install
-      
+        run: docker build -t cinemaabyss-api-tests .
+
       - name: Run API tests
         working-directory: tests/postman
+        shell: bash
         run: |
+          set -e
+          mkdir -p reports
+          docker run --rm \
+            --network="${{ steps.net.outputs.network }}" \
+            -v "$(pwd)/reports:/app/reports" \
+            cinemaabyss-api-tests --environment docker
 
-          docker compose up -d
-          # Wait for services to be ready
-          echo "Waiting for services to be ready..."
-          sleep 15
-          # Build the Docker image
-          docker build -t cinemaabyss-api-tests .
-          
-          # Run the tests in Docker
-          docker run --network=cinemaabyss-network -v "$(pwd)/reports:/app/reports" cinemaabyss-api-tests
-        
-      
       - name: Stop services
         if: always()
-        run: docker compose down
+        run: docker compose down -v
